@@ -1,0 +1,15 @@
+{
+    "title": "State Automate",
+    "config": {
+        "flow_title": "State Automate Configuration",
+        "step": {
+            "user": {
+                "title": "State Automate Configuration",
+                "description": "Configure the State Automate details."
+            }
+        },
+        "error": {
+            "use_yaml": "Use YAML to configure this integration"
+        }
+    }
+}

@@ -1,0 +1,11 @@
+{
+  "domain": "state_automate",
+  "name": "State Automate",
+  "version": "0.1",
+  "config_flow": true,
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [
+    "@koying"
+  ]
+}
