@@ -38,7 +38,7 @@ states:
         rgb_color: [0,255,0]
 ```
 
-### Special states:
+### Special states
 
 `enter`: Actions to be executed when the activity is selected  
 `leave`: Actions to be executed when the activity is deselected  
