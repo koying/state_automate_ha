@@ -7,15 +7,17 @@ import homeassistant.helpers.config_validation as cv
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ENTITY_ID, DEVICE_DEFAULT_NAME
-from homeassistant.core import HomeAssistant, State
+from homeassistant.const import CONF_ENTITY_ID, CONF_EVENT_DATA, DEVICE_DEFAULT_NAME
+from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.script import Script
 from homeassistant.helpers.event import async_track_state_change
 
-from .const import CONF_ACTIVITIES, DOMAIN, KEY_ENTER, KEY_LEAVE, PLATFORMS
+from custom_components.state_automate.common import check_dict_is_contained_in_another, extract_state_from_event
+
+from .const import CONF_ACTIVITIES, CONF_EVENT_TYPE, CONF_EVENT_VALUE, DOMAIN, KEY_ENTER, KEY_LEAVE, PLATFORMS
 
 SCRIPT_SCHEMA = vol.Schema(cv.SCRIPT_SCHEMA)
 
@@ -32,12 +34,8 @@ async def async_setup_platform(
         [
             StateAutomateSelect(
                 hass,
-                unique_id=f'{DOMAIN}_{discovery_info[CONF_ENTITY_ID]}_select',
-                entity_id=discovery_info[CONF_ENTITY_ID],
-                name=f'State Automate {discovery_info[CONF_ENTITY_ID]}',
-                icon="mdi:remote",
                 current_option="none",
-                activities=discovery_info[CONF_ACTIVITIES],
+                config=discovery_info
             ),
         ]
     )
@@ -51,8 +49,8 @@ async def async_setup_entry(
     """Set up the StateAutomate config entry."""
     if config_entry.entry_id not in hass.data[DOMAIN]:
         return
-    activities = hass.data[DOMAIN][config_entry.entry_id][config_entry.data.get(CONF_ENTITY_ID)]
-    await async_setup_platform(hass, {}, async_add_entities, {CONF_ENTITY_ID: config_entry.data.get(CONF_ENTITY_ID), CONF_ACTIVITIES: activities})
+    config = hass.data[DOMAIN][config_entry.entry_id]
+    await async_setup_platform(hass, {}, async_add_entities, config)
 
 
 class StateAutomateSelect(SelectEntity):
@@ -63,43 +61,61 @@ class StateAutomateSelect(SelectEntity):
     def __init__(
         self,
         hass: HomeAssistant,
-        unique_id: str,
-        entity_id: str,
-        name: str,
-        icon: str,
+        config: dict,
         current_option: str | None,
-        activities: list,
     ) -> None:
         """Initialize the Demo select entity."""
         self._hass = hass
-        self._attr_unique_id = unique_id
-        self._attr_name = name or DEVICE_DEFAULT_NAME
+        self._config = config
         self._attr_current_option = current_option
-        self._attr_icon = icon
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, unique_id)},
-            name=name,
-        )
+        self._attr_icon = "mdi:remote"
+
+        activities = config[CONF_ACTIVITIES]
         _LOGGER.debug(activities)
 
         self._attr_options =  [o['name'] for o in activities] 
 
-        self._entity_id = entity_id
         self._activity_dict = {}
         for act in activities:
             self._activity_dict[act['name']] = act['states']
         self._action_dict = {}
 
         async def _state_publisher(entity_id: str, old_state: State, new_state: State):
-            _LOGGER.debug(f"New state {new_state.state}")
+            _LOGGER.debug(f"New entity state {new_state.state}")
             if new_state is None:
                 return      
-            if new_state.state not in self._action_dict:
+            if str(new_state.state) not in self._action_dict:
                 return
 
-            await self._action_dict[new_state.state].async_run(context=self._context)
+            await self._action_dict[str(new_state.state)].async_run(context=self._context)
 
-        async_track_state_change(hass, self._entity_id, _state_publisher)
+        async def _event_publisher(event: Event):
+            """Update state when event is received."""
+            if check_dict_is_contained_in_another(self._event_data, event.data):
+                # Extract new state
+                new_state = extract_state_from_event(self._event_value, event.data)
+
+                # Apply custom state mapping
+                # if new_state in self._state_map:
+                #     new_state = self._state_map[new_state]
+
+                _LOGGER.debug(f"New event state {new_state}")
+                if str(new_state) not in self._action_dict:
+                    return
+
+                await self._action_dict[str(new_state)].async_run(context=self._context)
+
+        self._event_listener = None
+        if CONF_ENTITY_ID in config:
+            self._attr_unique_id = f'{DOMAIN}_{config[CONF_ENTITY_ID]}_select'
+            self._attr_name = f'State Automate {config[CONF_ENTITY_ID]}'
+            async_track_state_change(hass, config[CONF_ENTITY_ID], _state_publisher)
+        else:
+            self._attr_unique_id = f'{DOMAIN}_{config[CONF_EVENT_TYPE]}_{config[CONF_EVENT_VALUE]}_select'
+            self._attr_name = f'State Automate {config[CONF_EVENT_TYPE]}'
+            self._event_data = config[CONF_EVENT_DATA]
+            self._event_value = config[CONF_EVENT_VALUE]
+            self._event_listener = self._hass.bus.async_listen(config[CONF_EVENT_TYPE], _event_publisher)
 
     async def async_select_option(self, option: str) -> None:
         """Update the current selected option."""
@@ -127,3 +143,10 @@ class StateAutomateSelect(SelectEntity):
         _LOGGER.debug(self._action_dict)
 
         self.async_write_ha_state()
+
+    async def async_will_remove_from_hass(self):
+        """Remove listeners when removing entity from Home Assistant."""
+        if self._event_listener is not None:
+            self._event_listener()
+            self._event_listener = None
+            _LOGGER.debug("%s: Removed event listener", self.entity_id)

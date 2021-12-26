@@ -1,0 +1,5 @@
+{
+    "name": "State Automate",
+    "domains": ["select"],
+    "render_readme": true
+  }

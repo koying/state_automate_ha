@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import ( # pylint: disable=import-error
     CONF_ENTITY_ID,
+    CONF_EVENT_DATA,
     CONF_NAME,
     SERVICE_RELOAD,
 )
@@ -27,6 +28,8 @@ from homeassistant.helpers.dispatcher import ( # pylint: disable=import-error
 
 from .const import (
     CONF_ACTIVITIES,
+    CONF_EVENT_TYPE,
+    CONF_EVENT_VALUE,
     CONF_STATES,
     DOMAIN,
     PLATFORMS,
@@ -75,10 +78,16 @@ ENTITY_SCHEMA = vol.Schema({
     vol.Required(CONF_ENTITY_ID): cv.entity_id,
     vol.Required(CONF_ACTIVITIES): vol.All(cv.ensure_list, [ACTIVITY_SCHEMA]),
 })
+EVENT_SCHEMA = vol.Schema({
+    vol.Required(CONF_EVENT_TYPE): cv.string,
+    vol.Required(CONF_EVENT_VALUE): cv.string,
+    vol.Optional(CONF_EVENT_DATA): vol.All(_ensure_dict),
+    vol.Required(CONF_ACTIVITIES): vol.All(cv.ensure_list, [ACTIVITY_SCHEMA]),
+})
 
 CONFIG_SCHEMA = vol.Schema(
     {
-        DOMAIN: vol.All(cv.ensure_list, [ENTITY_SCHEMA]),
+        DOMAIN: vol.All(cv.ensure_list, [vol.Any(EVENT_SCHEMA, ENTITY_SCHEMA)]),
     },
     extra=vol.ALLOW_EXTRA,
 )
@@ -90,6 +99,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
     hass.data[DOMAIN] = {}
     config_yaml = json.loads(json.dumps(config[DOMAIN]))
+    _LOGGER.debug(config_yaml)
 
     for it in config_yaml:
         hass.async_add_job(
@@ -120,11 +130,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
 
     UPDATE_UNLISTENER = config_entry.add_update_listener(_update_listener)
 
-    _LOGGER.info("Initializing State Automate platform on %s", config.get(CONF_ENTITY_ID))
+    _LOGGER.info("Initializing State Automate platform on %s", config.get(CONF_ENTITY_ID) if CONF_ENTITY_ID in config else config.get(CONF_EVENT_TYPE))
     _LOGGER.debug(config)
 
-    hass.data[DOMAIN][config_entry.entry_id] = {}
-    hass.data[DOMAIN][config_entry.entry_id][config.get(CONF_ENTITY_ID)] = config.get(CONF_ACTIVITIES)
+    hass.data[DOMAIN][config_entry.entry_id] = config
 
     for component in PLATFORMS:
         hass.async_create_task(
