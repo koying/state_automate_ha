@@ -34,7 +34,7 @@ async def async_setup_platform(
         [
             StateAutomateSelect(
                 hass,
-                current_option="none",
+                current_option="idle",
                 config=discovery_info
             ),
         ]
@@ -78,6 +78,7 @@ class StateAutomateSelect(SelectEntity):
         self._activity_dict = {}
         for act in activities:
             self._activity_dict[act['name']] = act['states']
+
         self._action_dict = {}
 
         async def _state_publisher(entity_id: str, old_state: State, new_state: State):
@@ -143,6 +144,17 @@ class StateAutomateSelect(SelectEntity):
         _LOGGER.debug(self._action_dict)
 
         self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        if self._attr_current_option in self._activity_dict:
+            for k, v in self._activity_dict[self._attr_current_option].items():
+                try:
+                    script_data = SCRIPT_SCHEMA(v)
+                except vol.Invalid as err:
+                    _LOGGER.error(err)
+                    return
+                script_obj = Script(self._hass, script_data, f"{DOMAIN} script", DOMAIN)
+                self._action_dict[str(k)] = script_obj
 
     async def async_will_remove_from_hass(self):
         """Remove listeners when removing entity from Home Assistant."""
