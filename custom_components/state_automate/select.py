@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+import re
 from homeassistant.helpers.reload import async_setup_reload_service
 
 import voluptuous as vol
@@ -17,7 +18,7 @@ from homeassistant.helpers.event import async_track_state_change
 
 from custom_components.state_automate.common import check_dict_is_contained_in_another, extract_state_from_event
 
-from .const import CONF_ACTIVITIES, CONF_EVENT_TYPE, CONF_EVENT_VALUE, DOMAIN, KEY_ENTER, KEY_LEAVE, PLATFORMS
+from .const import CONF_ACTIVITIES, CONF_EVENT_TYPE, CONF_EVENT_VALUE, CONF_STATES, DOMAIN, KEY_ENTER, KEY_LEAVE, PLATFORMS
 
 SCRIPT_SCHEMA = vol.Schema(cv.SCRIPT_SCHEMA)
 
@@ -64,7 +65,7 @@ class StateAutomateSelect(SelectEntity):
         config: dict,
         current_option: str | None,
     ) -> None:
-        """Initialize the Demo select entity."""
+        """Initialize the State Automate select entity."""
         self._hass = hass
         self._config = config
         self._attr_current_option = current_option
@@ -75,9 +76,12 @@ class StateAutomateSelect(SelectEntity):
 
         self._attr_options =  [o['name'] for o in activities] 
 
+        pattern = re.compile(fr"^{CONF_STATES}(| .+)$")
         self._activity_dict = {}
         for act in activities:
-            self._activity_dict[act['name']] = act['states']
+            self._activity_dict[act['name']] = {}
+            for key in [key for key in act.keys() if pattern.match(key)]:
+                self._activity_dict[act['name']].update(act[key])
 
         self._action_dict = {}
 

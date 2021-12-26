@@ -77,7 +77,7 @@ def _script_dict(value: Any) -> Any:
 ACTIVITY_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_NAME): cv.string,
-        vol.Required(CONF_STATES): vol.All(_ensure_dict, _script_dict),
+        vol.Match(fr"^{CONF_STATES}(| .+)$"): vol.All(_ensure_dict, _script_dict),
     }
 )
 ENTITY_SCHEMA = vol.Schema(
