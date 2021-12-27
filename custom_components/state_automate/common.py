@@ -220,9 +220,12 @@ def check_dict_is_contained_in_another(filter_data: dict, data: dict) -> bool:
       will look for dicts containing
       `{"base_key": {"sub_key": "value"}}`
     """
-    for key, value in filter_data.items():
+    for key, value in filter_data.items():            
         if key in data:
-            if data[key] != value:
+            lst_val = [value]
+            if "|" in value:
+                lst_val = [v.strip() for v in value.split("|")] 
+            if data[key] not in lst_val:
                 return False
             continue
 
