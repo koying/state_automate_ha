@@ -13,7 +13,7 @@ from homeassistant.core import Event, HomeAssistant, State, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-from homeassistant.helpers.script import Script
+from homeassistant.helpers.script import SCRIPT_MODE_RESTART, Script
 from homeassistant.helpers.event import async_track_state_change
 
 from custom_components.state_automate.common import check_dict_is_contained_in_another, extract_state_from_event
@@ -139,7 +139,7 @@ class StateAutomateSelect(SelectEntity):
             except vol.Invalid as err:
                 _LOGGER.error(err)
                 return
-            script_obj = Script(self._hass, script_data, f"{DOMAIN} script", DOMAIN)
+            script_obj = Script(self._hass, script_data, f"{DOMAIN} script", DOMAIN, script_mode=SCRIPT_MODE_RESTART)
             self._action_dict[str(k)] = script_obj
 
         if KEY_ENTER in self._action_dict:
