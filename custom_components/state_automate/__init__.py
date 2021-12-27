@@ -3,8 +3,6 @@ from collections import OrderedDict
 import copy
 import json
 import logging
-import glob
-from datetime import timedelta
 from typing import Any
 from typing_extensions import Required
 
@@ -18,7 +16,7 @@ from homeassistant.const import (  # pylint: disable=import-error
     CONF_NAME,
     SERVICE_RELOAD,
 )
-from homeassistant.util import yaml
+from homeassistant.helpers import entity_registry as er
 
 import homeassistant.helpers.config_validation as cv  # pylint: disable=import-error
 from homeassistant.helpers.reload import setup_reload_service
@@ -102,6 +100,7 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+
 async def _async_process_config(
     hass: HomeAssistant,
     config: dict[str, Any],
@@ -116,6 +115,7 @@ async def _async_process_config(
                 DOMAIN, context={"source": SOURCE_IMPORT}, data=copy.deepcopy(it)
             )
         )
+
 
 async def async_setup(hass: HomeAssistant, config: dict):
     if DOMAIN not in config:
@@ -180,24 +180,29 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     return True
 
 
-async def _update_listener(hass, config_entry):
+async def _update_listener(hass: HomeAssistant, config_entry: ConfigEntry):
     """Update listener."""
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, config: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     _LOGGER.info("Unloading state_automate")
 
     unload_ok = all(
         await asyncio.gather(
             *[
-                hass.config_entries.async_forward_entry_unload(config, component)
+                hass.config_entries.async_forward_entry_unload(config_entry, component)
                 for component in PLATFORMS
             ]
         )
     )
 
+    entity_registry = er.async_get(hass)
+    entries = er.async_entries_for_config_entry(entity_registry, config_entry.entry_id)
+    for entry in entries:
+        entity_registry.async_remove(entry.entity_id)
+
     if unload_ok:
-        hass.data[DOMAIN].pop(config.entry_id)
+        hass.data[DOMAIN].pop(config_entry.entry_id)
 
     return unload_ok
