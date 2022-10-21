@@ -1,11 +1,10 @@
 """Config flow for StateAutomate."""
 import logging
 
-import voluptuous as vol
-
-from homeassistant import config_entries, exceptions
-from homeassistant.core import callback
+from homeassistant import config_entries
+from homeassistant.util import slugify
 from homeassistant.const import ( # pylint: disable=import-error
+    CONF_NAME,
     CONF_ENTITY_ID,
 )
 
@@ -37,17 +36,23 @@ class StateAutomateFlowHandler(config_entries.ConfigFlow):
         """Handle a flow initialized by the user."""
 
         self._errors = {}
+        title = ""
 
         if user_input is not None:
-            if CONF_ENTITY_ID in user_input:
+            if CONF_NAME in user_input:
+                await self.async_set_unique_id(f'{DOMAIN}_{slugify(user_input[CONF_NAME])}')
+                title = user_input[CONF_NAME]
+            elif CONF_ENTITY_ID in user_input:
                 await self.async_set_unique_id(f'{DOMAIN}_{user_input[CONF_ENTITY_ID]}')
+                title = f"State Automate: {user_input[CONF_ENTITY_ID]}"
             else:
                 await self.async_set_unique_id(f'{DOMAIN}_{user_input[CONF_EVENT_TYPE]}_{user_input[CONF_EVENT_VALUE]}')
-            # self._abort_if_unique_id_configured()
+                title = f"State Automate: {user_input[CONF_EVENT_TYPE]}"
+            self._abort_if_unique_id_configured(user_input)
 
             _LOGGER.debug(f"async_step_user: {user_input}")
             return self.async_create_entry(
-                title=f"State Automate: {user_input[CONF_ENTITY_ID] if CONF_ENTITY_ID in user_input else user_input[CONF_EVENT_TYPE]}",
+                title=title,
                 data=user_input,
             )
 

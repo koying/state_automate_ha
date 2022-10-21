@@ -1,6 +1,7 @@
 from __future__ import annotations
 import logging
 import re
+from homeassistant.util import slugify
 from homeassistant.helpers.reload import async_setup_reload_service
 
 import voluptuous as vol
@@ -8,9 +9,8 @@ import homeassistant.helpers.config_validation as cv
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ENTITY_ID, CONF_EVENT_DATA, DEVICE_DEFAULT_NAME
-from homeassistant.core import Event, HomeAssistant, State, callback
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.const import CONF_NAME, CONF_ENTITY_ID, CONF_EVENT_DATA, DEVICE_DEFAULT_NAME
+from homeassistant.core import Event, HomeAssistant, State
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.helpers.script import SCRIPT_MODE_RESTART, Script
@@ -111,13 +111,19 @@ class StateAutomateSelect(SelectEntity):
                 await self._action_dict[str(new_state)].async_run(context=self._context)
 
         self._event_listener = None
-        if CONF_ENTITY_ID in config:
+        if CONF_NAME in config:
+            self._attr_unique_id = f'{DOMAIN}_{slugify(config[CONF_NAME])}_select'
+            self._attr_name = config[CONF_NAME]
+        elif CONF_ENTITY_ID in config:
             self._attr_unique_id = f'{DOMAIN}_{config[CONF_ENTITY_ID]}_select'
             self._attr_name = f'State Automate {config[CONF_ENTITY_ID]}'
-            async_track_state_change(hass, config[CONF_ENTITY_ID], _state_publisher)
         else:
             self._attr_unique_id = f'{DOMAIN}_{config[CONF_EVENT_TYPE]}_{config[CONF_EVENT_VALUE]}_select'
             self._attr_name = f'State Automate {config[CONF_EVENT_TYPE]}'
+
+        if CONF_ENTITY_ID in config:
+            async_track_state_change(hass, config[CONF_ENTITY_ID], _state_publisher)
+        else:
             self._event_data = config[CONF_EVENT_DATA]
             self._event_value = config[CONF_EVENT_VALUE]
             self._event_listener = self._hass.bus.async_listen(config[CONF_EVENT_TYPE], _event_publisher)

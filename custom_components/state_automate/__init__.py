@@ -82,12 +82,14 @@ ENTITY_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_ENTITY_ID): cv.entity_id,
         vol.Required(CONF_ACTIVITIES): vol.All(cv.ensure_list, [ACTIVITY_SCHEMA]),
+        vol.Optional(CONF_NAME): cv.string,
     }
 )
 EVENT_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_EVENT_TYPE): cv.string,
         vol.Required(CONF_EVENT_VALUE): cv.string,
+        vol.Optional(CONF_NAME): cv.string,
         vol.Optional(CONF_EVENT_DATA): vol.All(_ensure_dict),
         vol.Required(CONF_ACTIVITIES): vol.All(cv.ensure_list, [ACTIVITY_SCHEMA]),
     }
@@ -128,6 +130,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
     async def reload_service_handler(service_call):
         if (conf := await component.async_prepare_reload()) is None:
+            _LOGGER.error(f"Cannot trigger reload")
             return
         await _async_process_config(hass, conf, component)
         hass.bus.async_fire(SIGNAL_STATE_UPDATED, context=service_call.context)
